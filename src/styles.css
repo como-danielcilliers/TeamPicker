@@ -63,6 +63,14 @@ button:disabled {
   animation: fade-up 0.45s ease both;
 }
 
+.app-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .app-header h1 {
   margin: 0;
   font-family: var(--font-sans);
@@ -76,6 +84,30 @@ button:disabled {
   margin: 0.4rem 0 0;
   color: var(--ink-muted);
   max-width: 40ch;
+}
+
+.data-transfer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.data-transfer-actions {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.data-transfer-input {
+  display: none;
+}
+
+.data-transfer-error {
+  margin: 0;
+  max-width: 28ch;
+  font-size: 0.8rem;
+  color: #8a1f1f;
+  text-align: right;
 }
 
 .workspace {
