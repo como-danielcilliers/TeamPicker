@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AssignmentBoard } from './components/AssignmentBoard';
+import { DataTransfer } from './components/DataTransfer';
 import { MemberList } from './components/MemberList';
 import { TeamList } from './components/TeamList';
 import { assignEqually } from './lib/assign';
@@ -56,10 +57,23 @@ export default function App() {
     setAssignment(null);
   }
 
+  function handleImport(nextMembers: Member[], nextTeams: Team[]) {
+    setMembers(nextMembers);
+    setTeams(nextTeams);
+    setAssignment(null);
+  }
+
   return (
     <div className="app">
       <header className="app-header">
-        <h1>TeamPicker</h1>
+        <div className="app-header-top">
+          <h1>TeamPicker</h1>
+          <DataTransfer
+            members={members}
+            teams={teams}
+            onImport={handleImport}
+          />
+        </div>
         <p>Build teams, then assign members evenly for this session.</p>
       </header>
 

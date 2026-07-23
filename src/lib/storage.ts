@@ -2,6 +2,14 @@ import type { Member, Team } from '../types';
 
 const TEAMS_KEY = 'teampicker:teams';
 const MEMBERS_KEY = 'teampicker:members';
+const EXPORT_VERSION = 1;
+
+export type ExportPayload = {
+  version: number;
+  exportedAt: string;
+  members: Member[];
+  teams: Team[];
+};
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -32,4 +40,64 @@ export function saveMembers(members: Member[]): void {
 
 export function createId(): string {
   return crypto.randomUUID();
+}
+
+export function buildExportPayload(
+  members: Member[],
+  teams: Team[],
+): ExportPayload {
+  return {
+    version: EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    members,
+    teams,
+  };
+}
+
+function isNamedEntity(value: unknown): value is { id: string; name: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { id?: unknown }).id === 'string' &&
+    typeof (value as { name?: unknown }).name === 'string'
+  );
+}
+
+function parseEntityList(
+  value: unknown,
+  label: string,
+): { id: string; name: string }[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`Invalid backup: "${label}" must be an array.`);
+  }
+  return value.map((item, index) => {
+    if (!isNamedEntity(item)) {
+      throw new Error(
+        `Invalid backup: "${label}[${index}]" must have string id and name.`,
+      );
+    }
+    return { id: item.id, name: item.name };
+  });
+}
+
+export function parseImportPayload(data: unknown): {
+  members: Member[];
+  teams: Team[];
+} {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    throw new Error('Invalid backup: expected a JSON object.');
+  }
+
+  const record = data as Record<string, unknown>;
+
+  if (record.version !== EXPORT_VERSION) {
+    throw new Error(
+      `Invalid backup: unsupported version (expected ${EXPORT_VERSION}).`,
+    );
+  }
+
+  return {
+    members: parseEntityList(record.members, 'members'),
+    teams: parseEntityList(record.teams, 'teams'),
+  };
 }
