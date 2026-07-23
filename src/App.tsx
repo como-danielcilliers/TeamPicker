@@ -11,13 +11,13 @@ import {
   saveMembers,
   saveTeams,
 } from './lib/storage';
-import type { Assignment, Member, Team } from './types';
+import type { AssignmentResult, Member, Team } from './types';
 import './styles.css';
 
 export default function App() {
   const [members, setMembers] = useState<Member[]>(() => loadMembers());
   const [teams, setTeams] = useState<Team[]>(() => loadTeams());
-  const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [assignment, setAssignment] = useState<AssignmentResult | null>(null);
 
   useEffect(() => {
     saveMembers(members);
@@ -94,7 +94,8 @@ export default function App() {
 
         <AssignmentBoard
           teams={teams}
-          assignment={assignment}
+          assignment={assignment?.teams ?? null}
+          leaders={assignment?.leaders ?? {}}
           memberCount={members.length}
           onAssign={handleAssign}
           onClear={handleClear}

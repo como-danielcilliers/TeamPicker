@@ -1,4 +1,4 @@
-import type { Assignment, Member, Team } from '../types';
+import type { Assignment, AssignmentResult, Member, Team } from '../types';
 
 /** Fisher–Yates shuffle (in place). */
 function shuffle<T>(items: T[]): T[] {
@@ -12,9 +12,13 @@ function shuffle<T>(items: T[]): T[] {
 /**
  * Randomly assign members to teams as evenly as possible.
  * Team sizes differ by at most 1.
+ * Picks one random leader per non-empty team.
  */
-export function assignEqually(members: Member[], teams: Team[]): Assignment {
-  if (teams.length === 0) return {};
+export function assignEqually(
+  members: Member[],
+  teams: Team[],
+): AssignmentResult {
+  if (teams.length === 0) return { teams: {}, leaders: {} };
 
   const shuffled = shuffle([...members]);
   const buckets: Assignment = Object.fromEntries(teams.map((t) => [t.id, []]));
@@ -23,5 +27,13 @@ export function assignEqually(members: Member[], teams: Team[]): Assignment {
     buckets[teams[index % teams.length].id].push(member);
   });
 
-  return buckets;
+  const leaders: Record<string, string> = {};
+  for (const team of teams) {
+    const roster = buckets[team.id];
+    if (roster.length > 0) {
+      leaders[team.id] = roster[Math.floor(Math.random() * roster.length)].id;
+    }
+  }
+
+  return { teams: buckets, leaders };
 }

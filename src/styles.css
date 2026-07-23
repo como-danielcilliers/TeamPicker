@@ -349,6 +349,10 @@ button:disabled {
 }
 
 .team-column li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.35rem 0;
   border-bottom: 1px solid var(--line);
   font-size: 0.95rem;
@@ -356,6 +360,22 @@ button:disabled {
 
 .team-column li:last-child {
   border-bottom: none;
+}
+
+.team-column li.leader {
+  margin: 0 -0.4rem;
+  padding: 0.35rem 0.4rem;
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.team-column li.leader .leader-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 @keyframes fade-up {
