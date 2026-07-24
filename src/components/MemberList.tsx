@@ -6,9 +6,15 @@ type MemberListProps = {
   members: Member[];
   onAdd: (name: string) => void;
   onRemove: (id: string) => void;
+  onToggleAbsent: (id: string) => void;
 };
 
-export function MemberList({ members, onAdd, onRemove }: MemberListProps) {
+export function MemberList({
+  members,
+  onAdd,
+  onRemove,
+  onToggleAbsent,
+}: MemberListProps) {
   const [name, setName] = useState('');
 
   function handleSubmit(event: FormEvent) {
@@ -45,16 +51,42 @@ export function MemberList({ members, onAdd, onRemove }: MemberListProps) {
       ) : (
         <ul className="entity-list">
           {members.map((member) => (
-            <li key={member.id} className="entity-row">
-              <span className="entity-name">{member.name}</span>
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => onRemove(member.id)}
-                aria-label={`Remove ${member.name}`}
-              >
-                Remove
-              </button>
+            <li
+              key={member.id}
+              className={
+                member.absent ? 'entity-row entity-row--absent' : 'entity-row'
+              }
+            >
+              <div className="entity-row-main">
+                <span className="entity-name">{member.name}</span>
+                {member.absent && (
+                  <span className="absent-label" aria-hidden="true">
+                    Away
+                  </span>
+                )}
+              </div>
+              <div className="row-actions">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => onToggleAbsent(member.id)}
+                  aria-label={
+                    member.absent
+                      ? `Mark ${member.name} present`
+                      : `Mark ${member.name} absent`
+                  }
+                >
+                  {member.absent ? 'Mark present' : 'Mark absent'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => onRemove(member.id)}
+                  aria-label={`Remove ${member.name}`}
+                >
+                  Remove
+                </button>
+              </div>
             </li>
           ))}
         </ul>

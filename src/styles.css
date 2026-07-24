@@ -260,6 +260,34 @@ button:disabled {
   white-space: nowrap;
 }
 
+.entity-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.entity-row--absent {
+  opacity: 0.65;
+  border-left: 3px solid var(--ink-muted);
+  padding-left: 0.65rem;
+  margin-left: -0.15rem;
+}
+
+.entity-row--absent .entity-name {
+  color: var(--ink-muted);
+}
+
+.absent-label {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
 .row-actions {
   display: flex;
   gap: 0.15rem;

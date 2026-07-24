@@ -20,7 +20,8 @@ export function assignEqually(
 ): AssignmentResult {
   if (teams.length === 0) return { teams: {}, leaders: {} };
 
-  const shuffled = shuffle([...members]);
+  const available = members.filter((m) => !m.absent);
+  const shuffled = shuffle([...available]);
   const buckets: Assignment = Object.fromEntries(teams.map((t) => [t.id, []]));
 
   shuffled.forEach((member, index) => {

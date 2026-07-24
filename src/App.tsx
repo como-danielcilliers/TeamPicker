@@ -28,11 +28,18 @@ export default function App() {
   }, [teams]);
 
   function addMember(name: string) {
-    setMembers((prev) => [...prev, { id: createId(), name }]);
+    setMembers((prev) => [...prev, { id: createId(), name, absent: false }]);
   }
 
   function removeMember(id: string) {
     setMembers((prev) => prev.filter((m) => m.id !== id));
+    setAssignment(null);
+  }
+
+  function toggleAbsent(id: string) {
+    setMembers((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, absent: !m.absent } : m)),
+    );
     setAssignment(null);
   }
 
@@ -50,8 +57,11 @@ export default function App() {
   }
 
   function handleAssign() {
-    setAssignment(assignEqually(members, teams));
+    const available = members.filter((m) => !m.absent);
+    setAssignment(assignEqually(available, teams));
   }
+
+  const availableMemberCount = members.filter((m) => !m.absent).length;
 
   function handleClear() {
     setAssignment(null);
@@ -83,6 +93,7 @@ export default function App() {
             members={members}
             onAdd={addMember}
             onRemove={removeMember}
+            onToggleAbsent={toggleAbsent}
           />
           <TeamList
             teams={teams}
@@ -96,7 +107,7 @@ export default function App() {
           teams={teams}
           assignment={assignment?.teams ?? null}
           leaders={assignment?.leaders ?? {}}
-          memberCount={members.length}
+          memberCount={availableMemberCount}
           onAssign={handleAssign}
           onClear={handleClear}
         />

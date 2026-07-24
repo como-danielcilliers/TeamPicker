@@ -1,6 +1,7 @@
 export type Member = {
   id: string;
   name: string;
+  absent: boolean;
 };
 
 export type Team = {
