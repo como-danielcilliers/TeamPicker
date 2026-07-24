@@ -3,6 +3,7 @@ import type { Assignment, Team } from '../types';
 type AssignmentBoardProps = {
   teams: Team[];
   assignment: Assignment | null;
+  leaders: Record<string, string>;
   memberCount: number;
   onAssign: () => void;
   onClear: () => void;
@@ -11,6 +12,7 @@ type AssignmentBoardProps = {
 export function AssignmentBoard({
   teams,
   assignment,
+  leaders,
   memberCount,
   onAssign,
   onClear,
@@ -54,6 +56,7 @@ export function AssignmentBoard({
         <div className="assignment-grid" key={Object.keys(assignment).join('-')}>
           {teams.map((team) => {
             const roster = assignment[team.id] ?? [];
+            const leaderId = leaders[team.id];
             return (
               <div key={team.id} className="team-column">
                 <h3>
@@ -64,9 +67,20 @@ export function AssignmentBoard({
                   <p className="empty subtle">Empty</p>
                 ) : (
                   <ul>
-                    {roster.map((member) => (
-                      <li key={member.id}>{member.name}</li>
-                    ))}
+                    {roster.map((member) => {
+                      const isLeader = member.id === leaderId;
+                      return (
+                        <li
+                          key={member.id}
+                          className={isLeader ? 'leader' : undefined}
+                        >
+                          <span className="member-name">{member.name}</span>
+                          {isLeader && (
+                            <span className="leader-label">Leader</span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
