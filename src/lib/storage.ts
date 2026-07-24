@@ -31,7 +31,10 @@ export function saveTeams(teams: Team[]): void {
 }
 
 export function loadMembers(): Member[] {
-  return readJson<Member[]>(MEMBERS_KEY, []);
+  return readJson<Member[]>(MEMBERS_KEY, []).map((member) => ({
+    ...member,
+    absent: typeof member.absent === 'boolean' ? member.absent : false,
+  }));
 }
 
 export function saveMembers(members: Member[]): void {
@@ -80,6 +83,22 @@ function parseEntityList(
   });
 }
 
+function parseMembersList(value: unknown): Member[] {
+  if (!Array.isArray(value)) {
+    throw new Error('Invalid backup: "members" must be an array.');
+  }
+  return value.map((item, index) => {
+    if (!isNamedEntity(item)) {
+      throw new Error(
+        `Invalid backup: "members[${index}]" must have string id and name.`,
+      );
+    }
+    const record = item as { id: string; name: string; absent?: unknown };
+    const absent = typeof record.absent === 'boolean' ? record.absent : false;
+    return { id: record.id, name: record.name, absent };
+  });
+}
+
 export function parseImportPayload(data: unknown): {
   members: Member[];
   teams: Team[];
@@ -97,7 +116,7 @@ export function parseImportPayload(data: unknown): {
   }
 
   return {
-    members: parseEntityList(record.members, 'members'),
+    members: parseMembersList(record.members),
     teams: parseEntityList(record.teams, 'teams'),
   };
 }
