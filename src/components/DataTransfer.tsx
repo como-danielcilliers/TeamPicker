@@ -4,17 +4,23 @@ import {
   buildExportPayload,
   parseImportPayload,
 } from '../lib/storage';
-import type { Member, Team } from '../types';
+import type { LeaderRun, Member, Team } from '../types';
 
 type DataTransferProps = {
   members: Member[];
   teams: Team[];
-  onImport: (members: Member[], teams: Team[]) => void;
+  leaderHistory: LeaderRun[];
+  onImport: (
+    members: Member[],
+    teams: Team[],
+    leaderHistory: LeaderRun[],
+  ) => void;
 };
 
 export function DataTransfer({
   members,
   teams,
+  leaderHistory,
   onImport,
 }: DataTransferProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -22,7 +28,7 @@ export function DataTransfer({
 
   function handleExport() {
     setError(null);
-    const payload = buildExportPayload(members, teams);
+    const payload = buildExportPayload(members, teams, leaderHistory);
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: 'application/json',
     });
@@ -45,7 +51,7 @@ export function DataTransfer({
     if (!file) return;
 
     const confirmed = window.confirm(
-      'Replace all members and teams with this file?',
+      'Replace all members, teams, and leader history with this file?',
     );
     if (!confirmed) return;
 
@@ -57,9 +63,12 @@ export function DataTransfer({
       } catch {
         throw new Error('Invalid backup: file is not valid JSON.');
       }
-      const { members: nextMembers, teams: nextTeams } =
-        parseImportPayload(parsed);
-      onImport(nextMembers, nextTeams);
+      const {
+        members: nextMembers,
+        teams: nextTeams,
+        leaderHistory: nextHistory,
+      } = parseImportPayload(parsed);
+      onImport(nextMembers, nextTeams, nextHistory);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed.');

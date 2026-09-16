@@ -1,22 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AssignmentBoard } from './components/AssignmentBoard';
 import { DataTransfer } from './components/DataTransfer';
 import { MemberList } from './components/MemberList';
 import { TeamList } from './components/TeamList';
-import { assignEqually } from './lib/assign';
+import { assignEqually, buildLeaderStats } from './lib/assign';
 import {
   createId,
+  loadLeaderHistory,
   loadMembers,
   loadTeams,
+  saveLeaderHistory,
   saveMembers,
   saveTeams,
+  upsertLeaderRun,
 } from './lib/storage';
-import type { AssignmentResult, Member, Team } from './types';
+import type { AssignmentResult, LeaderRun, Member, Team } from './types';
 import './styles.css';
 
 export default function App() {
   const [members, setMembers] = useState<Member[]>(() => loadMembers());
   const [teams, setTeams] = useState<Team[]>(() => loadTeams());
+  const [leaderHistory, setLeaderHistory] = useState<LeaderRun[]>(() =>
+    loadLeaderHistory(),
+  );
   const [assignment, setAssignment] = useState<AssignmentResult | null>(null);
 
   useEffect(() => {
@@ -26,6 +32,15 @@ export default function App() {
   useEffect(() => {
     saveTeams(teams);
   }, [teams]);
+
+  useEffect(() => {
+    saveLeaderHistory(leaderHistory);
+  }, [leaderHistory]);
+
+  const leaderStats = useMemo(
+    () => buildLeaderStats(leaderHistory, members.map((member) => member.id)),
+    [leaderHistory, members],
+  );
 
   function addMember(name: string) {
     setMembers((prev) => [...prev, { id: createId(), name, absent: false }]);
@@ -57,8 +72,22 @@ export default function App() {
   }
 
   function handleAssign() {
-    const available = members.filter((m) => !m.absent);
-    setAssignment(assignEqually(available, teams));
+    const historyForStats = assignment
+      ? leaderHistory.filter((run) => run.id !== assignment.runId)
+      : leaderHistory;
+    const stats = buildLeaderStats(
+      historyForStats,
+      members.map((member) => member.id),
+    );
+    const runId = assignment?.runId ?? createId();
+    const result = assignEqually(members, teams, stats, runId);
+    const run: LeaderRun = {
+      id: runId,
+      at: new Date().toISOString(),
+      leaders: result.leaders,
+    };
+    setAssignment(result);
+    setLeaderHistory((prev) => upsertLeaderRun(prev, run));
   }
 
   const availableMemberCount = members.filter((m) => !m.absent).length;
@@ -67,9 +96,19 @@ export default function App() {
     setAssignment(null);
   }
 
-  function handleImport(nextMembers: Member[], nextTeams: Team[]) {
+  function resetLeaderHistory() {
+    setLeaderHistory([]);
+    setAssignment(null);
+  }
+
+  function handleImport(
+    nextMembers: Member[],
+    nextTeams: Team[],
+    nextHistory: LeaderRun[],
+  ) {
     setMembers(nextMembers);
     setTeams(nextTeams);
+    setLeaderHistory(nextHistory);
     setAssignment(null);
   }
 
@@ -81,6 +120,7 @@ export default function App() {
           <DataTransfer
             members={members}
             teams={teams}
+            leaderHistory={leaderHistory}
             onImport={handleImport}
           />
         </div>
@@ -91,9 +131,12 @@ export default function App() {
         <div className="side-panels">
           <MemberList
             members={members}
+            leaderStats={leaderStats}
+            hasLeaderHistory={leaderHistory.length > 0}
             onAdd={addMember}
             onRemove={removeMember}
             onToggleAbsent={toggleAbsent}
+            onResetLeaderHistory={resetLeaderHistory}
           />
           <TeamList
             teams={teams}
