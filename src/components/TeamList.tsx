@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { TEAM_INPUT_ID } from '../lib/format';
 import type { Team } from '../types';
+import { Icon } from './Icon';
 
 type TeamListProps = {
   teams: Team[];
@@ -13,6 +15,8 @@ export function TeamList({ teams, onAdd, onRename, onRemove }: TeamListProps) {
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  // Esc/Enter unmount the input, which can fire a trailing blur we must ignore.
+  const skipBlurCommit = useRef(false);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -23,12 +27,14 @@ export function TeamList({ teams, onAdd, onRename, onRemove }: TeamListProps) {
   }
 
   function startEdit(team: Team) {
+    skipBlurCommit.current = false;
     setEditingId(team.id);
     setDraft(team.name);
   }
 
   function commitEdit() {
-    if (!editingId) return;
+    if (!editingId || skipBlurCommit.current) return;
+    skipBlurCommit.current = true;
     const trimmed = draft.trim();
     if (trimmed) onRename(editingId, trimmed);
     setEditingId(null);
@@ -36,40 +42,43 @@ export function TeamList({ teams, onAdd, onRename, onRemove }: TeamListProps) {
   }
 
   function cancelEdit() {
+    skipBlurCommit.current = true;
     setEditingId(null);
     setDraft('');
   }
 
   return (
-    <section className="panel" aria-labelledby="teams-heading">
-      <header className="panel-header">
-        <h2 id="teams-heading">Teams</h2>
+    <section className="section" aria-labelledby="teams-heading">
+      <header className="section-header">
+        <h2 id="teams-heading" className="section-title">
+          Teams
+        </h2>
         <span className="count">{teams.length}</span>
       </header>
 
-      <form className="inline-form" onSubmit={handleSubmit}>
+      <form className="add-field" onSubmit={handleSubmit}>
+        <Icon name="plus" className="add-field-icon" />
         <input
+          id={TEAM_INPUT_ID}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Add a team"
           aria-label="Team name"
           autoComplete="off"
+          enterKeyHint="done"
         />
-        <button type="submit" disabled={!name.trim()}>
-          Add
-        </button>
       </form>
 
       {teams.length === 0 ? (
-        <p className="empty">No teams yet.</p>
+        <p className="hint">Create at least one team to assign into.</p>
       ) : (
         <ul className="entity-list">
           {teams.map((team) => (
             <li key={team.id} className="entity-row">
               {editingId === team.id ? (
                 <form
-                  className="inline-form edit-form"
+                  className="rename-form"
                   onSubmit={(e) => {
                     e.preventDefault();
                     commitEdit();
@@ -79,37 +88,48 @@ export function TeamList({ teams, onAdd, onRename, onRemove }: TeamListProps) {
                     type="text"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    aria-label="Rename team"
+                    onBlur={commitEdit}
+                    aria-label={`Rename ${team.name}`}
                     autoFocus
                     onKeyDown={(e) => {
-                      if (e.key === 'Escape') cancelEdit();
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        cancelEdit();
+                      }
                     }}
                   />
-                  <button type="submit" disabled={!draft.trim()}>
-                    Save
-                  </button>
-                  <button type="button" className="btn-ghost" onClick={cancelEdit}>
-                    Cancel
-                  </button>
+                  <span className="rename-hint" aria-hidden="true">
+                    Enter to save · Esc to cancel
+                  </span>
                 </form>
               ) : (
                 <>
-                  <span className="entity-name">{team.name}</span>
+                  <span className="team-swatch" aria-hidden="true" />
+                  <span
+                    className="entity-name"
+                    onDoubleClick={() => startEdit(team)}
+                    title="Double-click to rename"
+                  >
+                    {team.name}
+                  </span>
                   <div className="row-actions">
                     <button
                       type="button"
-                      className="btn-ghost"
+                      className="icon-btn"
                       onClick={() => startEdit(team)}
+                      aria-label={`Rename ${team.name}`}
+                      title="Rename"
                     >
-                      Rename
+                      <Icon name="pencil" />
                     </button>
                     <button
                       type="button"
-                      className="btn-ghost"
+                      className="icon-btn icon-btn--danger"
                       onClick={() => onRemove(team.id)}
                       aria-label={`Delete ${team.name}`}
+                      title="Delete"
                     >
-                      Delete
+                      <Icon name="trash" />
                     </button>
                   </div>
                 </>

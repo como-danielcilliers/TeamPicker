@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { AssignmentBoard } from './components/AssignmentBoard';
 import { DataTransfer } from './components/DataTransfer';
+import { Icon } from './components/Icon';
 import { MemberList } from './components/MemberList';
 import { TeamList } from './components/TeamList';
 import { assignEqually, buildLeaderStats } from './lib/assign';
+import { plural } from './lib/format';
 import {
   createId,
   loadLeaderHistory,
@@ -14,8 +17,28 @@ import {
   saveTeams,
   upsertLeaderRun,
 } from './lib/storage';
+import { applyTheme, loadTheme } from './lib/theme';
+import type { Theme } from './lib/theme';
+import { useToast } from './lib/toast';
 import type { AssignmentResult, LeaderRun, Member, Team } from './types';
 import './styles.css';
+
+function insertAt<T>(list: T[], index: number, item: T): T[] {
+  const next = [...list];
+  next.splice(Math.min(index, next.length), 0, item);
+  return next;
+}
+
+function withViewTransition(update: () => void) {
+  const reduceMotion = window.matchMedia?.(
+    '(prefers-reduced-motion: reduce)',
+  ).matches;
+  if (reduceMotion || typeof document.startViewTransition !== 'function') {
+    update();
+    return;
+  }
+  document.startViewTransition(() => flushSync(update));
+}
 
 export default function App() {
   const [members, setMembers] = useState<Member[]>(() => loadMembers());
@@ -24,6 +47,8 @@ export default function App() {
     loadLeaderHistory(),
   );
   const [assignment, setAssignment] = useState<AssignmentResult | null>(null);
+  const [theme, setTheme] = useState<Theme>(() => loadTheme());
+  const toast = useToast();
 
   useEffect(() => {
     saveMembers(members);
@@ -37,6 +62,10 @@ export default function App() {
     saveLeaderHistory(leaderHistory);
   }, [leaderHistory]);
 
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
   const leaderStats = useMemo(
     () => buildLeaderStats(leaderHistory, members.map((member) => member.id)),
     [leaderHistory, members],
@@ -47,8 +76,23 @@ export default function App() {
   }
 
   function removeMember(id: string) {
+    const index = members.findIndex((m) => m.id === id);
+    const removed = members[index];
+    if (!removed) return;
     setMembers((prev) => prev.filter((m) => m.id !== id));
     setAssignment(null);
+    toast({
+      message: `Removed ${removed.name}`,
+      action: {
+        label: 'Undo',
+        onClick: () =>
+          setMembers((prev) =>
+            prev.some((m) => m.id === removed.id)
+              ? prev
+              : insertAt(prev, index, removed),
+          ),
+      },
+    });
   }
 
   function toggleAbsent(id: string) {
@@ -67,8 +111,23 @@ export default function App() {
   }
 
   function removeTeam(id: string) {
+    const index = teams.findIndex((t) => t.id === id);
+    const removed = teams[index];
+    if (!removed) return;
     setTeams((prev) => prev.filter((t) => t.id !== id));
     setAssignment(null);
+    toast({
+      message: `Deleted ${removed.name}`,
+      action: {
+        label: 'Undo',
+        onClick: () =>
+          setTeams((prev) =>
+            prev.some((t) => t.id === removed.id)
+              ? prev
+              : insertAt(prev, index, removed),
+          ),
+      },
+    });
   }
 
   function handleAssign() {
@@ -86,11 +145,14 @@ export default function App() {
       at: new Date().toISOString(),
       leaders: result.leaders,
     };
-    setAssignment(result);
-    setLeaderHistory((prev) => upsertLeaderRun(prev, run));
+    withViewTransition(() => {
+      setAssignment(result);
+      setLeaderHistory((prev) => upsertLeaderRun(prev, run));
+    });
   }
 
-  const availableMemberCount = members.filter((m) => !m.absent).length;
+  const presentCount = members.filter((m) => !m.absent).length;
+  const awayCount = members.length - presentCount;
 
   function handleClear() {
     setAssignment(null);
@@ -99,6 +161,7 @@ export default function App() {
   function resetLeaderHistory() {
     setLeaderHistory([]);
     setAssignment(null);
+    toast({ message: 'Leader history reset', tone: 'success' });
   }
 
   function handleImport(
@@ -112,23 +175,45 @@ export default function App() {
     setAssignment(null);
   }
 
+  const nextTheme: Theme = theme === 'dark' ? 'light' : 'dark';
+
   return (
     <div className="app">
-      <header className="app-header">
-        <div className="app-header-top">
-          <h1>TeamPicker</h1>
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            <Icon name="users" size={16} />
+          </span>
+          <h1 className="brand-name">TeamPicker</h1>
+        </div>
+
+        <p className="topbar-stats" aria-label="Session summary">
+          <span>{presentCount} present</span>
+          {awayCount > 0 && <span>{awayCount} away</span>}
+          <span>{plural(teams.length, 'team')}</span>
+        </p>
+
+        <div className="topbar-actions">
           <DataTransfer
             members={members}
             teams={teams}
             leaderHistory={leaderHistory}
             onImport={handleImport}
           />
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => setTheme(nextTheme)}
+            aria-label={`Switch to ${nextTheme} theme`}
+            title={`Switch to ${nextTheme} theme`}
+          >
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+          </button>
         </div>
-        <p>Build teams, then assign members evenly for this session.</p>
       </header>
 
-      <div className="workspace">
-        <div className="side-panels">
+      <main className="workspace">
+        <aside className="sidebar" aria-label="Members and teams">
           <MemberList
             members={members}
             leaderStats={leaderStats}
@@ -144,17 +229,17 @@ export default function App() {
             onRename={renameTeam}
             onRemove={removeTeam}
           />
-        </div>
+        </aside>
 
         <AssignmentBoard
           teams={teams}
           assignment={assignment?.teams ?? null}
           leaders={assignment?.leaders ?? {}}
-          memberCount={availableMemberCount}
+          memberCount={presentCount}
           onAssign={handleAssign}
           onClear={handleClear}
         />
-      </div>
+      </main>
     </div>
   );
 }
