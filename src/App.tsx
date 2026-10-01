@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { flushSync } from 'react-dom';
 import { AssignmentBoard } from './components/AssignmentBoard';
 import { DataTransfer } from './components/DataTransfer';
 import { Icon } from './components/Icon';
@@ -29,15 +28,42 @@ function insertAt<T>(list: T[], index: number, item: T): T[] {
   return next;
 }
 
-function withViewTransition(update: () => void) {
-  const reduceMotion = window.matchMedia?.(
-    '(prefers-reduced-motion: reduce)',
-  ).matches;
-  if (reduceMotion || typeof document.startViewTransition !== 'function') {
-    update();
-    return;
+/**
+ * Move a member to another team for this session only, optionally swapping
+ * with someone already there. Leaders are never moved, so the persisted
+ * leader history stays accurate.
+ */
+function moveMember(
+  result: AssignmentResult,
+  memberId: string,
+  toTeamId: string,
+  swapWithId: string | null,
+): AssignmentResult {
+  const teams = Object.fromEntries(
+    Object.entries(result.teams).map(([id, roster]) => [id, [...roster]]),
+  );
+  const fromTeamId = Object.keys(teams).find((id) =>
+    teams[id].some((m) => m.id === memberId),
+  );
+  if (!fromTeamId || fromTeamId === toTeamId || !teams[toTeamId]) return result;
+  if (Object.values(result.leaders).includes(memberId)) return result;
+
+  const fromRoster = teams[fromTeamId];
+  const toRoster = teams[toTeamId];
+  const moving = fromRoster.splice(
+    fromRoster.findIndex((m) => m.id === memberId),
+    1,
+  )[0];
+
+  const swapIndex = swapWithId ? toRoster.findIndex((m) => m.id === swapWithId) : -1;
+  if (swapIndex >= 0 && result.leaders[toTeamId] !== swapWithId) {
+    const [swapped] = toRoster.splice(swapIndex, 1, moving);
+    fromRoster.push(swapped);
+  } else {
+    toRoster.push(moving);
   }
-  document.startViewTransition(() => flushSync(update));
+
+  return { ...result, teams };
 }
 
 export default function App() {
@@ -47,6 +73,7 @@ export default function App() {
     loadLeaderHistory(),
   );
   const [assignment, setAssignment] = useState<AssignmentResult | null>(null);
+  const [drawKey, setDrawKey] = useState(0);
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
   const toast = useToast();
 
@@ -145,10 +172,15 @@ export default function App() {
       at: new Date().toISOString(),
       leaders: result.leaders,
     };
-    withViewTransition(() => {
-      setAssignment(result);
-      setLeaderHistory((prev) => upsertLeaderRun(prev, run));
-    });
+    setAssignment(result);
+    setDrawKey((key) => key + 1);
+    setLeaderHistory((prev) => upsertLeaderRun(prev, run));
+  }
+
+  function handleMove(memberId: string, toTeamId: string, swapWithId: string | null) {
+    setAssignment((current) =>
+      current ? moveMember(current, memberId, toTeamId, swapWithId) : current,
+    );
   }
 
   const presentCount = members.filter((m) => !m.absent).length;
@@ -217,6 +249,7 @@ export default function App() {
           <MemberList
             members={members}
             leaderStats={leaderStats}
+            leaderHistory={leaderHistory}
             hasLeaderHistory={leaderHistory.length > 0}
             onAdd={addMember}
             onRemove={removeMember}
@@ -236,8 +269,10 @@ export default function App() {
           assignment={assignment?.teams ?? null}
           leaders={assignment?.leaders ?? {}}
           memberCount={presentCount}
+          drawKey={drawKey}
           onAssign={handleAssign}
           onClear={handleClear}
+          onMove={handleMove}
         />
       </main>
     </div>

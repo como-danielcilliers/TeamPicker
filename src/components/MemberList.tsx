@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
-import type { LeaderStats, Member } from '../types';
-import { initials, MEMBER_INPUT_ID } from '../lib/format';
+import type { CSSProperties, FormEvent } from 'react';
+import type { LeaderRun, LeaderStats, Member } from '../types';
+import { hueOf, initials, MEMBER_INPUT_ID } from '../lib/format';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Icon } from './Icon';
+
+const ROTATION_WINDOW = 6;
 
 type MemberListProps = {
   members: Member[];
   leaderStats: LeaderStats;
+  leaderHistory: LeaderRun[];
   hasLeaderHistory: boolean;
   onAdd: (name: string) => void;
   onRemove: (id: string) => void;
@@ -18,6 +21,7 @@ type MemberListProps = {
 export function MemberList({
   members,
   leaderStats,
+  leaderHistory,
   hasLeaderHistory,
   onAdd,
   onRemove,
@@ -26,6 +30,7 @@ export function MemberList({
 }: MemberListProps) {
   const [name, setName] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
+  const recentRuns = leaderHistory.slice(-ROTATION_WINDOW);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -69,17 +74,31 @@ export function MemberList({
                 key={member.id}
                 className={member.absent ? 'entity-row is-absent' : 'entity-row'}
               >
-                <span className="avatar" aria-hidden="true">
+                <span
+                  className="avatar avatar--hue"
+                  aria-hidden="true"
+                  data-flip-source={member.id}
+                  style={{ '--hue': hueOf(member.name) } as CSSProperties}
+                >
                   {initials(member.name)}
                 </span>
                 <span className="entity-name">{member.name}</span>
-                {ledCount > 0 && (
+                {recentRuns.length > 0 && (
                   <span
-                    className="led-badge"
-                    title={`Has led ${ledCount} time${ledCount === 1 ? '' : 's'}`}
+                    className="rotation"
+                    title={`Led ${ledCount} time${ledCount === 1 ? '' : 's'} · last ${recentRuns.length} draws shown`}
+                    aria-label={`Has led ${ledCount} time${ledCount === 1 ? '' : 's'}`}
                   >
-                    <Icon name="crown" size={11} />
-                    {ledCount}
+                    {recentRuns.map((run) => (
+                      <i
+                        key={run.id}
+                        className={
+                          Object.values(run.leaders).includes(member.id)
+                            ? 'is-led'
+                            : undefined
+                        }
+                      />
+                    ))}
                   </span>
                 )}
                 <button

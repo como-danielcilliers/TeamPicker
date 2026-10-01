@@ -69,6 +69,16 @@ const paths = {
     </>
   ),
   check: <path d="M5 12l5 5 9-10" />,
+  grip: (
+    <>
+      <circle cx="9" cy="6" r="1.2" fill="currentColor" />
+      <circle cx="15" cy="6" r="1.2" fill="currentColor" />
+      <circle cx="9" cy="12" r="1.2" fill="currentColor" />
+      <circle cx="15" cy="12" r="1.2" fill="currentColor" />
+      <circle cx="9" cy="18" r="1.2" fill="currentColor" />
+      <circle cx="15" cy="18" r="1.2" fill="currentColor" />
+    </>
+  ),
   circle: <circle cx="12" cy="12" r="8" />,
   rotate: (
     <>
