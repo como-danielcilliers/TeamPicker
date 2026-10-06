@@ -42,40 +42,31 @@ export function buildLeaderStats(
 }
 
 /**
- * Prefer members who have led the fewest times, then those who led least
- * recently (never-led first). Remaining ties are random.
+ * Order members by leader priority: fewest leads first, then never-led or
+ * least recently led. Shuffling first makes remaining ties random, since
+ * `Array.prototype.sort` is stable.
  */
-export function pickLeader(roster: Member[], stats: LeaderStats): string {
-  const minCount = Math.min(
-    ...roster.map((member) => stats[member.id]?.count ?? 0),
-  );
-  const leastLed = roster.filter(
-    (member) => (stats[member.id]?.count ?? 0) === minCount,
-  );
-
-  const neverLed = leastLed.filter(
-    (member) => !stats[member.id]?.lastLedAt,
-  );
-  let pool = neverLed;
-  if (pool.length === 0) {
-    let oldest: string | null = null;
-    for (const member of leastLed) {
-      const at = stats[member.id]?.lastLedAt;
-      if (!at) continue;
-      if (oldest === null || at < oldest) oldest = at;
-    }
-    pool = leastLed.filter(
-      (member) => stats[member.id]?.lastLedAt === oldest,
-    );
-  }
-
-  return pool[Math.floor(Math.random() * pool.length)].id;
+export function rankByLeaderPriority(
+  members: Member[],
+  stats: LeaderStats,
+): Member[] {
+  return shuffle([...members]).sort((a, b) => {
+    const countDiff = (stats[a.id]?.count ?? 0) - (stats[b.id]?.count ?? 0);
+    if (countDiff !== 0) return countDiff;
+    const aAt = stats[a.id]?.lastLedAt ?? '';
+    const bAt = stats[b.id]?.lastLedAt ?? '';
+    return aAt < bAt ? -1 : aAt > bAt ? 1 : 0;
+  });
 }
 
 /**
  * Randomly assign members to teams as evenly as possible.
  * Team sizes differ by at most 1.
- * Picks one least-led leader per non-empty team.
+ *
+ * Leaders are chosen from the whole present group *before* teams are formed,
+ * so nobody leads again until everyone present has led as often as they have.
+ * Picking per team after shuffling can't guarantee that, because a team may
+ * end up containing only people who have already led.
  */
 export function assignEqually(
   members: Member[],
@@ -86,19 +77,29 @@ export function assignEqually(
   if (teams.length === 0) return { teams: {}, leaders: {}, runId };
 
   const available = members.filter((m) => !m.absent);
-  const shuffled = shuffle([...available]);
-  const buckets: Assignment = Object.fromEntries(teams.map((t) => [t.id, []]));
+  const ranked = rankByLeaderPriority(available, stats);
+  const leaderCount = Math.min(teams.length, ranked.length);
+  const chosenLeaders = ranked.slice(0, leaderCount);
+  const rest = shuffle(ranked.slice(leaderCount));
 
-  shuffled.forEach((member, index) => {
-    buckets[teams[index % teams.length].id].push(member);
+  // When there are fewer members than teams, spread leaders over random teams
+  // rather than always filling the first ones.
+  const teamOrder = shuffle([...teams]);
+  const buckets: Assignment = Object.fromEntries(teams.map((t) => [t.id, []]));
+  const leaders: Record<string, string> = {};
+
+  chosenLeaders.forEach((leader, index) => {
+    const teamId = teamOrder[index].id;
+    buckets[teamId].push(leader);
+    leaders[teamId] = leader.id;
   });
 
-  const leaders: Record<string, string> = {};
+  rest.forEach((member, index) => {
+    buckets[teamOrder[(leaderCount + index) % teams.length].id].push(member);
+  });
+
   for (const team of teams) {
-    const roster = buckets[team.id];
-    if (roster.length > 0) {
-      leaders[team.id] = pickLeader(roster, stats);
-    }
+    shuffle(buckets[team.id]);
   }
 
   return { teams: buckets, leaders, runId };
