@@ -1,4 +1,4 @@
-import type { LeaderRun, Member, Team } from '../types';
+import type { DrawSummary, LeaderRun, Member, Team } from '../types';
 
 const TEAMS_KEY = 'teampicker:teams';
 const MEMBERS_KEY = 'teampicker:members';
@@ -12,6 +12,7 @@ export type ExportPayload = {
   members: Member[];
   teams: Team[];
   leaderHistory: LeaderRun[];
+  lastDraw?: DrawSummary;
 };
 
 function readJson<T>(key: string, fallback: T): T {
@@ -85,6 +86,7 @@ export function buildExportPayload(
   members: Member[],
   teams: Team[],
   leaderHistory: LeaderRun[],
+  lastDraw?: DrawSummary,
 ): ExportPayload {
   return {
     version: EXPORT_VERSION,
@@ -92,6 +94,7 @@ export function buildExportPayload(
     members,
     teams,
     leaderHistory: leaderHistory.slice(-LEADER_HISTORY_CAP),
+    ...(lastDraw ? { lastDraw } : {}),
   };
 }
 
@@ -194,6 +197,7 @@ export function parseImportPayload(data: unknown): {
   members: Member[];
   teams: Team[];
   leaderHistory: LeaderRun[];
+  lastDraw: DrawSummary | null;
 } {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     throw new Error('Invalid backup: expected a JSON object.');
@@ -219,5 +223,34 @@ export function parseImportPayload(data: unknown): {
     members: parseMembersList(record.members),
     teams: parseEntityList(record.teams, 'teams'),
     leaderHistory,
+    lastDraw: parseDrawSummary(record.lastDraw),
   };
+}
+
+/** Lenient: an unreadable draw summary is dropped rather than failing the import. */
+export function parseDrawSummary(value: unknown): DrawSummary | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.runId !== 'string' ||
+    typeof record.at !== 'string' ||
+    !Array.isArray(record.teams)
+  ) {
+    return null;
+  }
+  const teams: DrawSummary['teams'] = [];
+  for (const item of record.teams as unknown[]) {
+    if (!isNamedEntity(item)) return null;
+    const team = item as { id: string; name: string; leader?: unknown; members?: unknown };
+    if (!Array.isArray(team.members) || !team.members.every((m) => typeof m === 'string')) {
+      return null;
+    }
+    teams.push({
+      id: team.id,
+      name: team.name,
+      leader: typeof team.leader === 'string' ? team.leader : null,
+      members: [...(team.members as string[])],
+    });
+  }
+  return { runId: record.runId, at: record.at, teams };
 }

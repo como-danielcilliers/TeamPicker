@@ -3,6 +3,7 @@ import { AssignmentBoard } from './components/AssignmentBoard';
 import { DataTransfer } from './components/DataTransfer';
 import { Icon } from './components/Icon';
 import { MemberList } from './components/MemberList';
+import { RepoSync } from './components/RepoSync';
 import { TeamList } from './components/TeamList';
 import { assignEqually, buildLeaderStats } from './lib/assign';
 import { plural } from './lib/format';
@@ -18,7 +19,10 @@ import {
 } from './lib/storage';
 import { applyTheme, loadTheme } from './lib/theme';
 import type { Theme } from './lib/theme';
+import { summarizeDraw } from './lib/sync';
 import { useToast } from './lib/toast';
+import { useRepoSync } from './lib/useRepoSync';
+import type { SharedData } from './lib/useRepoSync';
 import type { AssignmentResult, LeaderRun, Member, Team } from './types';
 import './styles.css';
 
@@ -97,6 +101,27 @@ export default function App() {
     () => buildLeaderStats(leaderHistory, members.map((member) => member.id)),
     [leaderHistory, members],
   );
+
+  const draw = useMemo(() => {
+    if (!assignment) return null;
+    const at =
+      leaderHistory.find((run) => run.id === assignment.runId)?.at ??
+      new Date().toISOString();
+    return summarizeDraw(assignment, teams, at);
+  }, [assignment, teams, leaderHistory]);
+
+  const sync = useRepoSync({
+    data: { members, teams, leaderHistory },
+    draw,
+    onApply: applySharedData,
+  });
+
+  function applySharedData(data: SharedData) {
+    setMembers(data.members);
+    setTeams(data.teams);
+    setLeaderHistory(data.leaderHistory);
+    setAssignment(null);
+  }
 
   function addMember(name: string) {
     setMembers((prev) => [...prev, { id: createId(), name, absent: false }]);
@@ -226,6 +251,7 @@ export default function App() {
         </p>
 
         <div className="topbar-actions">
+          <RepoSync sync={sync} />
           <DataTransfer
             members={members}
             teams={teams}
@@ -273,6 +299,20 @@ export default function App() {
           onAssign={handleAssign}
           onClear={handleClear}
           onMove={handleMove}
+          commit={
+            sync.config
+              ? {
+                  state:
+                    sync.busy === 'commit'
+                      ? 'busy'
+                      : sync.drawCommitted
+                        ? 'done'
+                        : 'idle',
+                  disabled: sync.busy !== null && sync.busy !== 'commit',
+                  onCommit: () => void sync.commit(),
+                }
+              : null
+          }
         />
       </main>
     </div>

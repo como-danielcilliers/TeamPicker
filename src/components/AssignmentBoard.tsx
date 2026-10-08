@@ -21,6 +21,12 @@ type AssignmentBoardProps = {
   onAssign: () => void;
   onClear: () => void;
   onMove: (memberId: string, toTeamId: string, swapWithId: string | null) => void;
+  /** Present only when a team repo is connected. */
+  commit?: {
+    state: 'idle' | 'busy' | 'done';
+    disabled: boolean;
+    onCommit: () => void;
+  } | null;
 };
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -59,6 +65,7 @@ export function AssignmentBoard({
   onAssign,
   onClear,
   onMove,
+  commit = null,
 }: AssignmentBoardProps) {
   const canAssign = teams.length > 0 && memberCount > 0;
   const gridRef = useRef<HTMLDivElement>(null);
@@ -126,6 +133,26 @@ export function AssignmentBoard({
           {assignment && (
             <button type="button" className="btn btn-ghost" onClick={onClear}>
               Clear
+            </button>
+          )}
+          {assignment && commit && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={commit.onCommit}
+              disabled={commit.disabled || commit.state !== 'idle'}
+              title={
+                commit.state === 'done'
+                  ? 'This draw is saved to the team repo'
+                  : 'Save this draw and the leader history to the team repo'
+              }
+            >
+              <Icon name={commit.state === 'done' ? 'check' : 'commit'} />
+              {commit.state === 'busy'
+                ? 'Committing…'
+                : commit.state === 'done'
+                  ? 'Committed'
+                  : 'Commit'}
             </button>
           )}
           <button
